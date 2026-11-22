@@ -13,6 +13,7 @@ from src.states.menu_state import MenuState
 from src.states.pause_state import PauseState
 from src.states.play_state import PlayState
 from src.states.state_machine import StateMachine
+from src.states.versus_state import VersusState
 
 
 def main() -> None:
@@ -31,10 +32,11 @@ def main() -> None:
 
     renderer = NeonRenderer(screen)
 
-    # Initialize state machine
+    # Initialize state machine with all single-player and multiplayer states
     state_machine = StateMachine()
     state_machine.add_state("menu", MenuState(state_machine))
     state_machine.add_state("play", PlayState(state_machine))
+    state_machine.add_state("versus", VersusState(state_machine))
     state_machine.add_state("pause", PauseState(state_machine))
     state_machine.add_state("game_over", GameOverState(state_machine))
 
@@ -44,7 +46,7 @@ def main() -> None:
     running = True
     while running:
         dt = clock.tick(FPS) / 1000.0
-        dt = min(dt, 0.1)  # Clamp delta time to avoid large physics steps on window drag
+        dt = min(dt, 0.1)  # Clamp delta time to avoid physics spikes
 
         # 1. Event Handling
         for event in pygame.event.get():

@@ -1,4 +1,4 @@
-"""Food management, spawning, and special fruit countdown timers."""
+"""Food management, spawning, and special fruit countdown timers with multi-snake & obstacle support."""
 
 import random
 from typing import Sequence
@@ -25,16 +25,13 @@ class SpecialFruit:
 
     @property
     def is_expired(self) -> bool:
-        """True if the fruit's timer has reached zero."""
         return self.time_remaining <= 0.0
 
     @property
     def progress(self) -> float:
-        """Fraction of lifespan remaining (1.0 down to 0.0)."""
         return max(0.0, self.time_remaining / self.lifespan)
 
     def update(self, dt: float) -> None:
-        """Reduces remaining lifespan."""
         self.time_remaining = max(0.0, self.time_remaining - dt)
 
 
@@ -46,14 +43,19 @@ class FoodManager:
         self.special_fruit: SpecialFruit | None = None
         self.regular_eaten_count: int = 0
 
-    def reset(self, snake: Snake) -> None:
+    def reset(self, snakes: Sequence[Snake] | Snake, obstacles: set[tuple[int, int]] | None = None) -> None:
         """Resets food manager state and spawns the initial regular food."""
         self.special_fruit = None
         self.regular_eaten_count = 0
-        self.spawn_regular(snake)
+        snake_list = [snakes] if isinstance(snakes, Snake) else list(snakes)
+        self.spawn_regular(snake_list, obstacles or set())
 
-    def _get_available_cells(self, snake: Snake) -> list[list[int]]:
-        occupied = set((seg[0], seg[1]) for seg in snake.segments)
+    def _get_available_cells(self, snakes: Sequence[Snake], obstacles: set[tuple[int, int]]) -> list[list[int]]:
+        occupied = set(obstacles)
+        for s in snakes:
+            for seg in s.segments:
+                occupied.add((seg[0], seg[1]))
+
         if self.special_fruit:
             occupied.add((self.special_fruit.position[0], self.special_fruit.position[1]))
         if self.regular_food:
@@ -66,15 +68,15 @@ class FoodManager:
                     available.append([col, row])
         return available
 
-    def spawn_regular(self, snake: Snake) -> None:
-        """Spawns a regular apple at an unoccupied cell."""
-        available = self._get_available_cells(snake)
+    def spawn_regular(self, snakes: Sequence[Snake] | Snake, obstacles: set[tuple[int, int]] | None = None) -> None:
+        snake_list = [snakes] if isinstance(snakes, Snake) else list(snakes)
+        available = self._get_available_cells(snake_list, obstacles or set())
         if available:
             self.regular_food = random.choice(available)
 
-    def spawn_special(self, snake: Snake) -> None:
-        """Spawns a special power-up fruit (Golden, Freeze, or Ghost)."""
-        available = self._get_available_cells(snake)
+    def spawn_special(self, snakes: Sequence[Snake] | Snake, obstacles: set[tuple[int, int]] | None = None) -> None:
+        snake_list = [snakes] if isinstance(snakes, Snake) else list(snakes)
+        available = self._get_available_cells(snake_list, obstacles or set())
         if not available:
             return
 
@@ -83,21 +85,25 @@ class FoodManager:
         self.special_fruit = SpecialFruit(pos, choice)
 
     def update(self, dt: float) -> None:
-        """Updates the active special fruit timer and removes it if expired."""
         if self.special_fruit:
             self.special_fruit.update(dt)
             if self.special_fruit.is_expired:
                 self.special_fruit = None
 
-    def on_regular_eaten(self, snake: Snake) -> None:
-        """Tracks regular food eaten and triggers special fruit milestone spawns."""
+    def on_regular_eaten(self, snakes: Sequence[Snake] | Snake, obstacles: set[tuple[int, int]] | None = None) -> None:
+        snake_list = [snakes] if isinstance(snakes, Snake) else list(snakes)
         self.regular_eaten_count += 1
-        self.spawn_regular(snake)
+        self.spawn_regular(snake_list, obstacles or set())
         if self.regular_eaten_count % SPECIAL_FRUIT_SPAWN_INTERVAL == 0 and self.special_fruit is None:
-            self.spawn_special(snake)
+            self.spawn_special(snake_list, obstacles or set())
 
-    def check_consumption(self, head: list[int], snake: Snake) -> FruitType | None:
-        """Checks if snake head occupies regular or special food. Handles consumption."""
+    def check_consumption(
+        self,
+        head: list[int],
+        snakes: Sequence[Snake] | Snake,
+        obstacles: set[tuple[int, int]] | None = None,
+    ) -> FruitType | None:
+        snake_list = [snakes] if isinstance(snakes, Snake) else list(snakes)
         # Check special fruit first
         if self.special_fruit and head == self.special_fruit.position:
             consumed_type = self.special_fruit.fruit_type
@@ -106,7 +112,7 @@ class FoodManager:
 
         # Check regular food
         if head == self.regular_food:
-            self.on_regular_eaten(snake)
+            self.on_regular_eaten(snake_list, obstacles or set())
             return FruitType.REGULAR
 
         return None

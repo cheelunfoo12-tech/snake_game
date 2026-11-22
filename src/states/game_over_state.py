@@ -9,6 +9,7 @@ from src.config import (
     CYAN,
     GOLD,
     GRAY,
+    GameMode,
     PANEL,
     RED,
     WHITE,
@@ -27,6 +28,9 @@ class GameOverState(BaseState):
         self.high_score: int = 0
         self.level: int = 5
         self.is_new_high: bool = False
+        self.winner_text: str | None = None
+        self.reason: str | None = None
+        self.mode: GameMode = GameMode.CLASSIC
         self.pulse_frame: int = 0
 
         self.replay_button: pygame.Rect = pygame.Rect(WIDTH // 2 - 150, 400, 300, 54)
@@ -37,7 +41,10 @@ class GameOverState(BaseState):
         self.score = params.get("score", 0)
         self.high_score = params.get("high_score", 0)
         self.level = params.get("level", 5)
-        self.is_new_high = self.score >= self.high_score and self.score > 0
+        self.winner_text = params.get("winner_text")
+        self.reason = params.get("reason")
+        self.mode = params.get("mode", GameMode.CLASSIC)
+        self.is_new_high = self.score >= self.high_score and self.score > 0 and self.winner_text is None
         self.pulse_frame = 0
 
     def handle_event(self, event: pygame.event.Event) -> None:
@@ -60,7 +67,10 @@ class GameOverState(BaseState):
 
     def _replay(self) -> None:
         midi_synth.start()
-        self.state_machine.change_state("play", {"level": self.level})
+        if self.mode == GameMode.VERSUS_DUEL or self.winner_text is not None:
+            self.state_machine.change_state("versus", {"is_ai": True})
+        else:
+            self.state_machine.change_state("play", {"mode": self.mode, "level": self.level})
 
     def update(self, dt: float) -> None:
         self.pulse_frame += 1
@@ -68,18 +78,23 @@ class GameOverState(BaseState):
     def draw(self, renderer: NeonRenderer) -> None:
         renderer.screen.fill(BACKGROUND)
 
-        # Header
-        renderer.draw_text("GAME OVER", renderer.title_font, RED, WIDTH // 2, 130)
+        # Header Title
+        title_text = "MATCH COMPLETE" if self.winner_text else (self.reason if self.reason else "GAME OVER")
+        title_color = GOLD if self.winner_text else RED
+        renderer.draw_text(title_text, renderer.title_font, title_color, WIDTH // 2, 130)
 
-        # High score celebration
-        if self.is_new_high:
+        # Subtitle / Winner Announcement
+        if self.winner_text:
+            renderer.draw_text(self.winner_text, renderer.heading_font, CYAN, WIDTH // 2, 205)
+        elif self.is_new_high:
             renderer.draw_text("★ NEW HIGH SCORE! ★", renderer.heading_font, GOLD, WIDTH // 2, 205)
         else:
-            renderer.draw_text(f"Level {self.level} Run Complete", renderer.small_font, GRAY, WIDTH // 2, 205)
+            renderer.draw_text(f"{self.mode.value.replace('_', ' ').title()} Run Complete", renderer.small_font, GRAY, WIDTH // 2, 205)
 
-        # Score stats cards
-        renderer.draw_text(f"Score: {self.score}", renderer.heading_font, WHITE, WIDTH // 2, 265)
-        renderer.draw_text(f"Best: {self.high_score}", renderer.body_font, GOLD, WIDTH // 2, 315)
+        # Scores
+        renderer.draw_text(f"Final Score: {self.score}", renderer.heading_font, WHITE, WIDTH // 2, 265)
+        if not self.winner_text:
+            renderer.draw_text(f"Personal Best: {self.high_score}", renderer.body_font, GOLD, WIDTH // 2, 315)
 
         # Replay Button
         renderer.draw_panel(self.replay_button, True)

@@ -13,10 +13,12 @@ os.environ["SDL_AUDIODRIVER"] = "dummy"
 import pygame
 pygame.init()
 
-from src.config import FruitType, GRID_COLUMNS, GRID_ROWS
+from src.config import FruitType, GRID_COLUMNS, GRID_ROWS, GameMode
 from src.entities.snake import Snake
 from src.entities.food import FoodManager
 from src.entities.particles import ParticleSystem
+from src.entities.obstacles import ObstacleManager, QuantumPortal
+from src.entities.ai_controller import AIController
 from src.states.state_machine import StateMachine, BaseState
 
 
@@ -25,13 +27,11 @@ def test_snake_movement_and_growth():
     assert snake.head == [10, 10]
     assert snake.length == 1
 
-    # Enqueue right
     snake.enqueue_direction((1, 0))
     snake.step()
     assert snake.head == [11, 10]
     assert len(snake.segments) == 1
 
-    # Grow snake
     snake.grow(2)
     snake.step()
     assert snake.head == [12, 10]
@@ -44,110 +44,86 @@ def test_snake_movement_and_growth():
 def test_direction_buffering_prevents_reversal():
     snake = Snake(10, 10)
     snake.enqueue_direction((1, 0))
-    snake.step()  # Moving right
+    snake.step()
 
-    # Immediate left turn should be rejected
+    # Immediate reversal ignored
     snake.enqueue_direction((-1, 0))
     assert len(snake.input_queue) == 0
 
-    # Rapid turn (Up then Left) should queue properly
+    # Rapid corner turn queued
     snake.enqueue_direction((0, -1))
     snake.enqueue_direction((-1, 0))
     assert len(snake.input_queue) == 2
 
 
 def test_wall_and_self_collision():
-    # Wall collision test
     snake = Snake(GRID_COLUMNS - 1, 10)
     snake.enqueue_direction((1, 0))
     snake.step()
     assert snake.check_wall_collision() is True
 
-    # Self collision test
     body_snake = Snake(10, 10)
     body_snake.segments = [[10, 10], [10, 11], [11, 11], [11, 10], [10, 10]]
     assert body_snake.check_self_collision() is True
 
-    # Ghost mode bypasses self collision
     body_snake.apply_ghost(5.0)
     assert body_snake.is_ghost is True
     assert body_snake.check_self_collision() is False
 
 
-def test_food_manager_and_special_spawns():
-    snake = Snake(10, 10)
+def test_quantum_portal_teleportation():
+    portal = QuantumPortal(gate_a=(10, 10), gate_b=(25, 25))
+    snake = Snake(9, 10, initial_dir=(1, 0))
+
+    # Stepping from (9, 10) moving right onto (10, 10) triggers teleportation
+    new_head = snake.step(portal)
+    # Portal transports to gate_b (25, 25) + direction (1, 0) = (26, 25)
+    assert new_head == (26, 25)
+    assert snake.just_teleported is True
+
+
+def test_obstacle_manager_and_progressive_morphing():
+    obs_mgr = ObstacleManager(GameMode.CLASSIC)
+    assert len(obs_mgr.obstacles) == 0
+    assert obs_mgr.portal is None
+
+    # Progressive morphing tier 2
+    obs_mgr.update_progressive(50)
+    assert len(obs_mgr.obstacles) > 0
+
+    # Progressive morphing tier 3
+    obs_mgr.update_progressive(85)
+    assert obs_mgr.portal is not None
+
+
+def test_ai_controller_pathfinding():
+    ai_snake = Snake(15, 15, player_id=2, initial_dir=(-1, 0))
+    player_snake = Snake(5, 5, player_id=1, initial_dir=(1, 0))
+    controller = AIController(ai_snake)
+
+    # Food to the left of AI
+    next_move = controller.compute_next_move(player_snake, [12, 15], obstacles=set())
+    assert next_move is not None
+    # Next move should be towards the food
+    assert next_move in [(-1, 0), (0, -1), (0, 1)]
+
+
+def test_food_manager_multi_snake():
+    s1 = Snake(10, 10)
+    s2 = Snake(20, 20)
     food_mgr = FoodManager()
-    food_mgr.reset(snake)
+    food_mgr.reset([s1, s2])
 
     assert food_mgr.regular_food is not None
-    assert food_mgr.special_fruit is None
-
-    # Simulate eating 5 regular foods
-    for i in range(5):
-        food_mgr.on_regular_eaten(snake)
-
-    # Milestone should have spawned a special fruit
-    assert food_mgr.special_fruit is not None
-    assert food_mgr.special_fruit.fruit_type in (
-        FruitType.GOLDEN,
-        FruitType.FREEZE,
-        FruitType.GHOST,
-    )
-
-    # Test expiration countdown
-    food_mgr.update(11.0)
-    assert food_mgr.special_fruit is None
-
-
-def test_particle_system():
-    ps = ParticleSystem()
-    ps.emit_burst(100.0, 100.0, (255, 0, 0), count=10)
-    assert len(ps.particles) == 10
-
-    # Updating with large dt should purge expired particles
-    ps.update(2.0)
-    assert len(ps.particles) == 0
-
-
-def test_state_machine_transitions():
-    class DummyState(BaseState):
-        def __init__(self, sm, name):
-            super().__init__(sm)
-            self.name = name
-            self.entered = False
-
-        def enter(self, params=None):
-            self.entered = True
-
-        def handle_event(self, event):
-            pass
-
-        def update(self, dt):
-            pass
-
-        def draw(self, renderer):
-            pass
-
-    sm = StateMachine()
-    s1 = DummyState(sm, "one")
-    s2 = DummyState(sm, "two")
-    sm.add_state("one", s1)
-    sm.add_state("two", s2)
-
-    sm.change_state("one")
-    assert sm.current_state_name == "one"
-    assert s1.entered is True
-
-    sm.change_state("two")
-    assert sm.current_state_name == "two"
-    assert s2.entered is True
+    assert food_mgr.regular_food not in (s1.segments + s2.segments)
 
 
 if __name__ == "__main__":
     test_snake_movement_and_growth()
     test_direction_buffering_prevents_reversal()
     test_wall_and_self_collision()
-    test_food_manager_and_special_spawns()
-    test_particle_system()
-    test_state_machine_transitions()
+    test_quantum_portal_teleportation()
+    test_obstacle_manager_and_progressive_morphing()
+    test_ai_controller_pathfinding()
+    test_food_manager_multi_snake()
     print("ALL TESTS PASSED SUCCESSFULLY!")

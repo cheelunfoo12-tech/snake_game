@@ -24,7 +24,7 @@ class MidiSynth:
             output_count = pygame.midi.get_count()
             for device_id in range(output_count):
                 info = pygame.midi.get_device_info(device_id)
-                if info and info[3] == 1:  # Is output device
+                if info and info[3] == 1:
                     self.output = pygame.midi.Output(device_id)
                     self.output.write_short(0xC0, 80)  # Synth Lead program
                     break
@@ -71,6 +71,18 @@ class MidiSynth:
         self.note(69, 200, 90)
         self.note(74, 250, 100)
         self.note(81, 350, 110)
+
+    def warp(self) -> None:
+        """SFX when traveling through a quantum portal."""
+        self.note(88, 120, 110)
+        self.note(95, 160, 115)
+
+    def round_win(self) -> None:
+        """SFX when a player wins a round in Versus Duel."""
+        self.note(64, 160, 100)
+        self.note(67, 160, 105)
+        self.note(71, 180, 110)
+        self.note(76, 320, 120)
 
     def death(self) -> None:
         """SFX on crash/game over."""
