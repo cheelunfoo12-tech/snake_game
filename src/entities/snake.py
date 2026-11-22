@@ -9,6 +9,7 @@ from src.config import (
     FREEZE_EFFECT_DURATION_SEC,
     GHOST_EFFECT_DURATION_SEC,
     GRID_COLUMNS,
+    GRID_MIN_ROW,
     GRID_ROWS,
 )
 from src.entities.obstacles import QuantumPortal
@@ -20,7 +21,7 @@ class Snake:
     def __init__(
         self,
         start_col: int = GRID_COLUMNS // 2,
-        start_row: int = GRID_ROWS // 2,
+        start_row: int = (GRID_MIN_ROW + GRID_ROWS) // 2,
         player_id: int = 1,
         head_color: tuple[int, int, int] = CYAN,
         body_color: tuple[int, int, int] = DARK_GREEN,
@@ -115,9 +116,14 @@ class Snake:
         self.length += amount
 
     def check_wall_collision(self) -> bool:
-        """Checks if snake head collided with grid boundaries."""
+        """Checks if snake head collided with grid boundaries or top HUD banner."""
         head_x, head_y = self.head
-        return head_x < 0 or head_x >= GRID_COLUMNS or head_y < 0 or head_y >= GRID_ROWS
+        return (
+            head_x < 0
+            or head_x >= GRID_COLUMNS
+            or head_y < GRID_MIN_ROW
+            or head_y >= GRID_ROWS
+        )
 
     def check_self_collision(self) -> bool:
         """Checks if head overlaps body segments. Ignored in ghost mode."""

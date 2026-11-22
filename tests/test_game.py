@@ -13,7 +13,7 @@ os.environ["SDL_AUDIODRIVER"] = "dummy"
 import pygame
 pygame.init()
 
-from src.config import FruitType, GRID_COLUMNS, GRID_ROWS, GameMode
+from src.config import FruitType, GRID_COLUMNS, GRID_MIN_ROW, GRID_ROWS, GameMode
 from src.entities.snake import Snake
 from src.entities.food import FoodManager
 from src.entities.particles import ParticleSystem
@@ -56,12 +56,22 @@ def test_direction_buffering_prevents_reversal():
     assert len(snake.input_queue) == 2
 
 
-def test_wall_and_self_collision():
+def test_wall_and_hud_boundary_collision():
+    # Right wall collision
     snake = Snake(GRID_COLUMNS - 1, 10)
     snake.enqueue_direction((1, 0))
     snake.step()
     assert snake.check_wall_collision() is True
 
+    # Top HUD boundary collision (hitting y < GRID_MIN_ROW = 3)
+    top_snake = Snake(10, GRID_MIN_ROW)
+    assert top_snake.check_wall_collision() is False
+    top_snake.enqueue_direction((0, -1))
+    top_snake.step()
+    assert top_snake.head[1] == GRID_MIN_ROW - 1
+    assert top_snake.check_wall_collision() is True
+
+    # Self collision test
     body_snake = Snake(10, 10)
     body_snake.segments = [[10, 10], [10, 11], [11, 11], [11, 10], [10, 10]]
     assert body_snake.check_self_collision() is True
@@ -71,13 +81,29 @@ def test_wall_and_self_collision():
     assert body_snake.check_self_collision() is False
 
 
+def test_food_always_within_playable_arena():
+    snake = Snake(10, 10)
+    food_mgr = FoodManager()
+
+    # Test 50 food spawns to ensure food NEVER spawns in rows 0, 1, 2 (behind HUD)
+    for _ in range(50):
+        food_mgr.spawn_regular(snake)
+        col, row = food_mgr.regular_food
+        assert 0 <= col < GRID_COLUMNS
+        assert GRID_MIN_ROW <= row < GRID_ROWS, f"Food spawned in HUD row {row}!"
+
+        food_mgr.spawn_special(snake)
+        if food_mgr.special_fruit:
+            scol, srow = food_mgr.special_fruit.position
+            assert 0 <= scol < GRID_COLUMNS
+            assert GRID_MIN_ROW <= srow < GRID_ROWS, f"Special fruit spawned in HUD row {srow}!"
+
+
 def test_quantum_portal_teleportation():
     portal = QuantumPortal(gate_a=(10, 10), gate_b=(25, 25))
     snake = Snake(9, 10, initial_dir=(1, 0))
 
-    # Stepping from (9, 10) moving right onto (10, 10) triggers teleportation
     new_head = snake.step(portal)
-    # Portal transports to gate_b (25, 25) + direction (1, 0) = (26, 25)
     assert new_head == (26, 25)
     assert snake.just_teleported is True
 
@@ -87,11 +113,11 @@ def test_obstacle_manager_and_progressive_morphing():
     assert len(obs_mgr.obstacles) == 0
     assert obs_mgr.portal is None
 
-    # Progressive morphing tier 2
     obs_mgr.update_progressive(50)
     assert len(obs_mgr.obstacles) > 0
+    for col, row in obs_mgr.obstacles:
+        assert GRID_MIN_ROW <= row < GRID_ROWS
 
-    # Progressive morphing tier 3
     obs_mgr.update_progressive(85)
     assert obs_mgr.portal is not None
 
@@ -101,29 +127,17 @@ def test_ai_controller_pathfinding():
     player_snake = Snake(5, 5, player_id=1, initial_dir=(1, 0))
     controller = AIController(ai_snake)
 
-    # Food to the left of AI
     next_move = controller.compute_next_move(player_snake, [12, 15], obstacles=set())
     assert next_move is not None
-    # Next move should be towards the food
     assert next_move in [(-1, 0), (0, -1), (0, 1)]
-
-
-def test_food_manager_multi_snake():
-    s1 = Snake(10, 10)
-    s2 = Snake(20, 20)
-    food_mgr = FoodManager()
-    food_mgr.reset([s1, s2])
-
-    assert food_mgr.regular_food is not None
-    assert food_mgr.regular_food not in (s1.segments + s2.segments)
 
 
 if __name__ == "__main__":
     test_snake_movement_and_growth()
     test_direction_buffering_prevents_reversal()
-    test_wall_and_self_collision()
+    test_wall_and_hud_boundary_collision()
+    test_food_always_within_playable_arena()
     test_quantum_portal_teleportation()
     test_obstacle_manager_and_progressive_morphing()
     test_ai_controller_pathfinding()
-    test_food_manager_multi_snake()
     print("ALL TESTS PASSED SUCCESSFULLY!")

@@ -3,6 +3,7 @@
 from typing import Iterable
 from src.config import (
     GRID_COLUMNS,
+    GRID_MIN_ROW,
     GRID_ROWS,
     PORTAL_PAIR_A,
     PORTAL_PAIR_B,
@@ -60,37 +61,34 @@ class ObstacleManager:
         elif self.mode == GameMode.TIME_ATTACK:
             self.portal = QuantumPortal()
         elif self.mode == GameMode.CLASSIC:
-            # Starts empty; morphs progressively with score
             pass
 
     def _build_versus_layout(self) -> None:
-        """Symmetric arena for 1v1 duels with paired portals and corner shields."""
+        """Symmetric arena for 1v1 duels with paired portals and center divider pillars."""
         self.portal = QuantumPortal(PORTAL_PAIR_A, PORTAL_PAIR_B)
-        # Symmetrical center divider pillars
-        for r in range(10, 13):
+        for r in range(11, 14):
             self.obstacles.add((GRID_COLUMNS // 2, r))
-        for r in range(17, 20):
+        for r in range(19, 22):
             self.obstacles.add((GRID_COLUMNS // 2, r))
 
     def _build_maze_layout(self) -> None:
-        """Dense neon labyrinth layout with geometric corridors."""
-        # Top-left and bottom-right corner hooks
+        """Dense neon labyrinth layout with geometric corridors strictly within bounds."""
         for c in range(8, 16):
-            self.obstacles.add((c, 8))
-            self.obstacles.add((GRID_COLUMNS - 1 - c, GRID_ROWS - 9))
-        for r in range(8, 16):
+            self.obstacles.add((c, 9))
+            self.obstacles.add((GRID_COLUMNS - 1 - c, GRID_ROWS - 5))
+        for r in range(9, 16):
             self.obstacles.add((15, r))
-            self.obstacles.add((GRID_COLUMNS - 16, GRID_ROWS - 1 - r))
+            self.obstacles.add((GRID_COLUMNS - 16, GRID_ROWS - 1 - (r - 4)))
 
         # Center chamber pillars
         for c in (18, 21):
-            for r in range(12, 18):
+            for r in range(13, 19):
                 self.obstacles.add((c, r))
 
         self.portal = QuantumPortal(PORTAL_PAIR_A, PORTAL_PAIR_B)
 
     def update_progressive(self, score: int) -> bool:
-        """Morphs the arena in Classic mode as the player hits score tiers. Returns True if layout changed."""
+        """Morphs the arena in Classic mode as the player hits score tiers."""
         if self.mode != GameMode.CLASSIC:
             return False
 
@@ -99,9 +97,9 @@ class ObstacleManager:
         if score >= 40 and self.current_tier < 2:
             self.current_tier = 2
             for c in (12, 27):
-                for r in range(8, 14):
+                for r in range(9, 14):
                     self.obstacles.add((c, r))
-                for r in range(16, 22):
+                for r in range(18, 23):
                     self.obstacles.add((c, r))
             changed = True
 
@@ -114,11 +112,9 @@ class ObstacleManager:
         return changed
 
     def is_blocked(self, col: int, row: int) -> bool:
-        """True if the given grid cell contains an obstacle barrier."""
         return (col, row) in self.obstacles
 
     def get_all_occupied(self) -> set[tuple[int, int]]:
-        """Returns all blocked obstacle coordinates and portal locations."""
         occupied = set(self.obstacles)
         if self.portal:
             occupied.add(self.portal.gate_a)

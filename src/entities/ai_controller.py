@@ -3,7 +3,7 @@
 from collections import deque
 from typing import Sequence
 
-from src.config import GRID_COLUMNS, GRID_ROWS
+from src.config import GRID_COLUMNS, GRID_MIN_ROW, GRID_ROWS
 from src.entities.obstacles import QuantumPortal
 from src.entities.snake import Snake
 
@@ -46,11 +46,11 @@ class AIController:
                 if dest:
                     nx, ny = dest[0] + dx, dest[1] + dy
 
-            if 0 <= nx < GRID_COLUMNS and 0 <= ny < GRID_ROWS and (nx, ny) not in blocked:
+            if 0 <= nx < GRID_COLUMNS and GRID_MIN_ROW <= ny < GRID_ROWS and (nx, ny) not in blocked:
                 valid_moves.append((dx, dy))
 
         if not valid_moves:
-            return None  # Trapped with nowhere to turn
+            return None
 
         if len(valid_moves) == 1:
             return valid_moves[0]
@@ -60,11 +60,10 @@ class AIController:
         target_goal = (food_pos[0], food_pos[1])
 
         if dist_to_player <= 7 and player_snake.current_direction != (0, 0):
-            # Project player head 2 steps ahead to cut them off
             pdx, pdy = player_snake.current_direction
             cut_x = player_snake.head[0] + pdx * 2
             cut_y = player_snake.head[1] + pdy * 2
-            if 0 <= cut_x < GRID_COLUMNS and 0 <= cut_y < GRID_ROWS and (cut_x, cut_y) not in blocked:
+            if 0 <= cut_x < GRID_COLUMNS and GRID_MIN_ROW <= cut_y < GRID_ROWS and (cut_x, cut_y) not in blocked:
                 target_goal = (cut_x, cut_y)
 
         # 3. BFS Shortest Path to Target Goal
@@ -115,7 +114,7 @@ class AIController:
                     if dest:
                         nx, ny = dest[0] + dx, dest[1] + dy
 
-                if 0 <= nx < GRID_COLUMNS and 0 <= ny < GRID_ROWS and (nx, ny) not in visited:
+                if 0 <= nx < GRID_COLUMNS and GRID_MIN_ROW <= ny < GRID_ROWS and (nx, ny) not in visited:
                     visited.add((nx, ny))
                     queue.append((nx, ny, initial_step))
 
@@ -133,7 +132,7 @@ class AIController:
             count += 1
             for dx, dy in self.directions:
                 nx, ny = cx + dx, cy + dy
-                if 0 <= nx < GRID_COLUMNS and 0 <= ny < GRID_ROWS and (nx, ny) not in visited:
+                if 0 <= nx < GRID_COLUMNS and GRID_MIN_ROW <= ny < GRID_ROWS and (nx, ny) not in visited:
                     visited.add((nx, ny))
                     queue.append((nx, ny))
 

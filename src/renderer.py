@@ -19,8 +19,10 @@ from src.config import (
     GOLD,
     GRAY,
     GRID_COLUMNS,
+    GRID_MIN_ROW,
     GRID_ROWS,
     HEIGHT,
+    HUD_HEIGHT,
     ICE_BLUE,
     OBSTACLE_BORDER,
     OBSTACLE_COLOR,
@@ -46,9 +48,9 @@ class NeonRenderer:
 
         # Pre-load typography
         self.title_font = self._get_font(56, bold=True)
-        self.heading_font = self._get_font(28, bold=True)
-        self.body_font = self._get_font(20, bold=True)
-        self.small_font = self._get_font(15, bold=False)
+        self.heading_font = self._get_font(26, bold=True)
+        self.body_font = self._get_font(18, bold=True)
+        self.small_font = self._get_font(14, bold=False)
 
         # Screen shake state
         self.shake_duration: float = 0.0
@@ -101,11 +103,14 @@ class NeonRenderer:
             self.shake_offset = (0, 0)
 
     def draw_grid_lines(self) -> None:
+        """Renders subtle neon grid lines strictly inside the playable arena."""
         ox, oy = self.shake_offset
+        # Vertical grid lines
         for col in range(GRID_COLUMNS + 1):
             x = col * CELL_SIZE + ox
-            pygame.draw.line(self.screen, PANEL, (x, oy), (x, HEIGHT + oy), 1)
-        for row in range(GRID_ROWS + 1):
+            pygame.draw.line(self.screen, PANEL, (x, HUD_HEIGHT + oy), (x, HEIGHT + oy), 1)
+        # Horizontal grid lines
+        for row in range(GRID_MIN_ROW, GRID_ROWS + 1):
             y = row * CELL_SIZE + oy
             pygame.draw.line(self.screen, PANEL, (ox, y), (WIDTH + ox, y), 1)
 
@@ -144,7 +149,6 @@ class NeonRenderer:
         """Renders snake body, glowing head, and eyes in movement direction."""
         ox, oy = self.shake_offset
 
-        # Determine head and body color based on power-ups
         if snake.is_ghost:
             head_color = GHOST_PURPLE
             body_color = (130, 60, 160)
@@ -173,15 +177,14 @@ class NeonRenderer:
                     border_radius=5,
                 )
 
-                # Draw snake eyes looking in current direction
+                # Snake eyes
                 dx, dy = snake.current_direction
                 cx = seg_x + CELL_SIZE // 2
                 cy = seg_y + CELL_SIZE // 2
                 eye_dist = 4
                 if dx == 0 and dy == 0:
-                    dx, dy = 1, 0  # default forward
+                    dx, dy = 1, 0
 
-                # Perpendicular vector for eye separation
                 px, py = -dy, dx
                 e1_x = cx + dx * 4 + px * eye_dist
                 e1_y = cy + dy * 4 + py * eye_dist
@@ -241,39 +244,44 @@ class NeonRenderer:
         food_mgr: FoodManager,
         is_muted: bool,
     ) -> None:
-        hud_bg = pygame.Rect(0, 0, WIDTH, 54)
+        """Draws top HUD cleanly inside y = 0..60px with power-up badges integrated."""
+        hud_bg = pygame.Rect(0, 0, WIDTH, HUD_HEIGHT)
         pygame.draw.rect(self.screen, PANEL, hud_bg)
-        pygame.draw.line(self.screen, PANEL_BORDER, (0, 54), (WIDTH, 54), 2)
+        pygame.draw.line(self.screen, CYAN, (0, HUD_HEIGHT), (WIDTH, HUD_HEIGHT), 2)
 
-        self.draw_text(f"SCORE  {score}", self.body_font, WHITE, 90, 27)
-        self.draw_text(f"BEST  {high_score}", self.body_font, GOLD, WIDTH // 2, 27)
-        self.draw_text(f"LVL {level}", self.body_font, CYAN, WIDTH - 180, 27)
+        # Left: Score & High Score
+        self.draw_text(f"SCORE: {score}", self.body_font, WHITE, 80, 28)
+        self.draw_text(f"BEST: {high_score}", self.body_font, GOLD, 195, 28)
 
-        mute_text = "MUTED (M)" if is_muted else "AUDIO ON (M)"
-        mute_color = GRAY if is_muted else CYAN
-        self.draw_text(mute_text, self.small_font, mute_color, WIDTH - 75, 27)
-
-        badge_y = 74
+        # Center: Active Power-up Badges (Contained strictly within HUD)
+        badge_x = 340
         if snake.is_ghost:
-            self.draw_badge(f"GHOST: {snake.ghost_timer:.1f}s", GHOST_PURPLE, 110, badge_y)
+            self.draw_badge(f"GHOST: {snake.ghost_timer:.1f}s", GHOST_PURPLE, badge_x, 28)
+            badge_x += 130
         if snake.is_frozen:
-            self.draw_badge(f"FREEZE: {snake.freeze_timer:.1f}s", ICE_BLUE, 245, badge_y)
+            self.draw_badge(f"FREEZE: {snake.freeze_timer:.1f}s", ICE_BLUE, badge_x, 28)
+            badge_x += 130
         if food_mgr.special_fruit:
             spec = food_mgr.special_fruit
             cfg = FRUIT_SPECS[spec.fruit_type]
-            self.draw_badge(f"{cfg.name.upper()}: {spec.time_remaining:.1f}s", cfg.color, WIDTH - 140, badge_y)
+            self.draw_badge(f"{cfg.name.upper()}: {spec.time_remaining:.1f}s", cfg.color, badge_x, 28)
+
+        # Right: Level & Mute
+        self.draw_text(f"LVL {level}", self.body_font, CYAN, WIDTH - 160, 28)
+        mute_text = "MUTED (M)" if is_muted else "AUDIO (M)"
+        self.draw_text(mute_text, self.small_font, GRAY if is_muted else CYAN, WIDTH - 75, 28)
 
     def draw_time_attack_hud(self, score: int, time_left: float, is_muted: bool) -> None:
-        hud_bg = pygame.Rect(0, 0, WIDTH, 54)
+        hud_bg = pygame.Rect(0, 0, WIDTH, HUD_HEIGHT)
         pygame.draw.rect(self.screen, PANEL, hud_bg)
-        pygame.draw.line(self.screen, PANEL_BORDER, (0, 54), (WIDTH, 54), 2)
+        pygame.draw.line(self.screen, GOLD, (0, HUD_HEIGHT), (WIDTH, HUD_HEIGHT), 2)
 
         timer_color = RED if time_left <= 10.0 else GOLD
-        self.draw_text(f"SCORE  {score}", self.body_font, WHITE, 110, 27)
-        self.draw_text(f"TIME REMAINING: {time_left:.1f}s", self.heading_font, timer_color, WIDTH // 2, 27)
+        self.draw_text(f"SCORE: {score}", self.body_font, WHITE, 100, 28)
+        self.draw_text(f"TIME REMAINING: {time_left:.1f}s", self.heading_font, timer_color, WIDTH // 2, 28)
 
         mute_text = "MUTED (M)" if is_muted else "AUDIO (M)"
-        self.draw_text(mute_text, self.small_font, GRAY if is_muted else CYAN, WIDTH - 75, 27)
+        self.draw_text(mute_text, self.small_font, GRAY if is_muted else CYAN, WIDTH - 75, 28)
 
     def draw_versus_hud(
         self,
@@ -284,30 +292,30 @@ class NeonRenderer:
         is_ai: bool,
         is_muted: bool,
     ) -> None:
-        hud_bg = pygame.Rect(0, 0, WIDTH, 54)
+        hud_bg = pygame.Rect(0, 0, WIDTH, HUD_HEIGHT)
         pygame.draw.rect(self.screen, PANEL, hud_bg)
-        pygame.draw.line(self.screen, PANEL_BORDER, (0, 54), (WIDTH, 54), 2)
+        pygame.draw.line(self.screen, PANEL_BORDER, (0, HUD_HEIGHT), (WIDTH, HUD_HEIGHT), 2)
 
         # Player 1 Info (Cyan)
         self.draw_text(f"P1 (WASD): {p1_score} pts", self.body_font, CYAN, 130, 20)
-        self.draw_text(f"Rounds: {p1_rounds}/2", self.small_font, WHITE, 130, 40)
+        self.draw_text(f"Rounds: {p1_rounds}/2", self.small_font, WHITE, 130, 42)
 
         # Center Duel VS
-        self.draw_text("VS", self.heading_font, WHITE, WIDTH // 2, 27)
+        self.draw_text("VS", self.heading_font, WHITE, WIDTH // 2, 28)
 
         # Player 2 / AI Info (Amber)
         rival_label = "AI BOT (Arrows)" if is_ai else "P2 (Arrows)"
         self.draw_text(f"{rival_label}: {p2_score} pts", self.body_font, AMBER, WIDTH - 150, 20)
-        self.draw_text(f"Rounds: {p2_rounds}/2", self.small_font, WHITE, WIDTH - 150, 40)
+        self.draw_text(f"Rounds: {p2_rounds}/2", self.small_font, WHITE, WIDTH - 150, 42)
 
     def draw_badge(self, text: str, color: tuple[int, int, int], center_x: int, center_y: int) -> None:
         surface = self.small_font.render(text, True, color)
-        width = surface.get_width() + 18
-        height = surface.get_height() + 8
+        width = surface.get_width() + 14
+        height = surface.get_height() + 6
         rect = pygame.Rect(center_x - width // 2, center_y - height // 2, width, height)
-        pygame.draw.rect(self.screen, PANEL, rect, border_radius=6)
-        pygame.draw.rect(self.screen, color, rect, width=1, border_radius=6)
-        self.screen.blit(surface, (rect.x + 9, rect.y + 4))
+        pygame.draw.rect(self.screen, PANEL, rect, border_radius=5)
+        pygame.draw.rect(self.screen, color, rect, width=1, border_radius=5)
+        self.screen.blit(surface, (rect.x + 7, rect.y + 3))
 
     def draw_text(
         self,

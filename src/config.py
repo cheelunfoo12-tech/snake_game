@@ -12,6 +12,10 @@ GRID_COLUMNS: int = 40
 GRID_ROWS: int = 30
 CELL_SIZE: int = 20
 
+# Playfield & HUD Boundaries
+HUD_HEIGHT: int = 60
+GRID_MIN_ROW: int = 3  # Rows 0, 1, 2 reserved for HUD (y = 0..60px)
+
 # Colors (RGB)
 BACKGROUND: tuple[int, int, int] = (6, 10, 22)
 PANEL: tuple[int, int, int] = (26, 36, 69)
@@ -128,5 +132,5 @@ SPEED_LEVELS: dict[int, float] = {
 }
 
 # Quantum Portal Locations
-PORTAL_PAIR_A: tuple[int, int] = (6, 15)
-PORTAL_PAIR_B: tuple[int, int] = (33, 15)
+PORTAL_PAIR_A: tuple[int, int] = (6, 16)
+PORTAL_PAIR_B: tuple[int, int] = (33, 16)

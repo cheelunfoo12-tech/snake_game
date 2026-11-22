@@ -7,6 +7,7 @@ from src.config import (
     FRUIT_SPECS,
     FruitType,
     GRID_COLUMNS,
+    GRID_MIN_ROW,
     GRID_ROWS,
     SPECIAL_FRUIT_LIFESPAN_SEC,
     SPECIAL_FRUIT_SPAWN_INTERVAL,
@@ -63,7 +64,7 @@ class FoodManager:
 
         available: list[list[int]] = []
         for col in range(GRID_COLUMNS):
-            for row in range(GRID_ROWS):
+            for row in range(GRID_MIN_ROW, GRID_ROWS):
                 if (col, row) not in occupied:
                     available.append([col, row])
         return available
@@ -104,13 +105,11 @@ class FoodManager:
         obstacles: set[tuple[int, int]] | None = None,
     ) -> FruitType | None:
         snake_list = [snakes] if isinstance(snakes, Snake) else list(snakes)
-        # Check special fruit first
         if self.special_fruit and head == self.special_fruit.position:
             consumed_type = self.special_fruit.fruit_type
             self.special_fruit = None
             return consumed_type
 
-        # Check regular food
         if head == self.regular_food:
             self.on_regular_eaten(snake_list, obstacles or set())
             return FruitType.REGULAR
